@@ -1,28 +1,41 @@
-#pragma once
+/**
+ *
+ *  @file Expected.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2025, Gaspard Kirira.
+ *  All rights reserved.
+ *  https://github.com/vixcpp/vix
+ *
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the License file.
+ *
+ *  Vix.cpp
+ */
+#ifndef VIX_CONVERSION_EXPECTED_HPP
+#define VIX_CONVERSION_EXPECTED_HPP
 
 #include <type_traits>
 #include <utility>
+#include <new>
+#include <cassert>
 
+#if defined(__has_include)
 #if __has_include(<expected>)
 #include <expected>
-#define VIX_CONVERSION_HAS_STD_EXPECTED 1
+#define VIX_HAS_STD_EXPECTED_HEADER 1
 #else
-#define VIX_CONVERSION_HAS_STD_EXPECTED 0
+#define VIX_HAS_STD_EXPECTED_HEADER 0
+#endif
+#else
+#define VIX_HAS_STD_EXPECTED_HEADER 0
 #endif
 
 namespace vix::conversion
 {
 
-/**
- * @brief expected<T, E> alias used by the conversion module.
- *
- * Policy:
- * - Prefer std::expected when available.
- * - Provide a small fallback when std::expected is not available.
- *
- * This type is used to avoid exceptions in conversion code.
- */
-#if VIX_CONVERSION_HAS_STD_EXPECTED
+// Use std::expected only when it truly exists (C++23 library feature).
+#if VIX_HAS_STD_EXPECTED_HEADER && defined(__cpp_lib_expected) && (__cpp_lib_expected >= 202202L)
 
   template <typename T, typename E>
   using expected = std::expected<T, E>;
@@ -30,7 +43,17 @@ namespace vix::conversion
   template <typename E>
   using unexpected = std::unexpected<E>;
 
+  template <typename E>
+  [[nodiscard]] constexpr unexpected<E> make_unexpected(E err)
+  {
+    return unexpected<E>(std::move(err));
+  }
+
 #else
+
+  // -----------------------------
+  // Minimal C++20 fallback expected
+  // -----------------------------
 
   template <typename E>
   class unexpected
@@ -38,17 +61,29 @@ namespace vix::conversion
   public:
     using error_type = E;
 
-    constexpr explicit unexpected(const E &e) : error_(e) {}
-    constexpr explicit unexpected(E &&e) noexcept(std::is_nothrow_move_constructible_v<E>)
-        : error_(std::move(e)) {}
+    constexpr explicit unexpected(const E &e)
+        : err_(e)
+    {
+    }
 
-    [[nodiscard]] constexpr const E &error() const & noexcept { return error_; }
-    [[nodiscard]] constexpr E &error() & noexcept { return error_; }
-    [[nodiscard]] constexpr E &&error() && noexcept { return std::move(error_); }
+    constexpr explicit unexpected(E &&e)
+        : err_(std::move(e))
+    {
+    }
+
+    [[nodiscard]] constexpr const E &error() const & noexcept { return err_; }
+    [[nodiscard]] constexpr E &error() & noexcept { return err_; }
+    [[nodiscard]] constexpr E &&error() && noexcept { return std::move(err_); }
 
   private:
-    E error_;
+    E err_;
   };
+
+  template <typename E>
+  [[nodiscard]] constexpr unexpected<E> make_unexpected(E err)
+  {
+    return unexpected<E>(std::move(err));
+  }
 
   template <typename T, typename E>
   class expected
@@ -57,113 +92,148 @@ namespace vix::conversion
     using value_type = T;
     using error_type = E;
 
-    // Constructors
-    constexpr expected(const T &v) : has_(true) { new (&storage_.value) T(v); }
-    constexpr expected(T &&v) noexcept(std::is_nothrow_move_constructible_v<T>)
-        : has_(true) { new (&storage_.value) T(std::move(v)); }
+    // value constructors
+    constexpr expected(const T &v)
+        : has_(true)
+    {
+      ::new (static_cast<void *>(&storage_.val_)) T(v);
+    }
 
-    constexpr expected(const unexpected<E> &u) : has_(false) { new (&storage_.error) E(u.error()); }
-    constexpr expected(unexpected<E> &&u) noexcept(std::is_nothrow_move_constructible_v<E>)
-        : has_(false) { new (&storage_.error) E(std::move(u).error()); }
+    constexpr expected(T &&v)
+        : has_(true)
+    {
+      ::new (static_cast<void *>(&storage_.val_)) T(std::move(v));
+    }
 
-    constexpr expected(const expected &o)
+    // error constructors
+    constexpr expected(const unexpected<E> &u)
+        : has_(false)
+    {
+      ::new (static_cast<void *>(&storage_.err_)) E(u.error());
+    }
+
+    constexpr expected(unexpected<E> &&u)
+        : has_(false)
+    {
+      ::new (static_cast<void *>(&storage_.err_)) E(std::move(u).error());
+    }
+
+    // copy/move
+    expected(const expected &o)
         : has_(o.has_)
     {
       if (has_)
-        new (&storage_.value) T(o.storage_.value);
+        ::new (static_cast<void *>(&storage_.val_)) T(o.storage_.val_);
       else
-        new (&storage_.error) E(o.storage_.error);
+        ::new (static_cast<void *>(&storage_.err_)) E(o.storage_.err_);
     }
 
-    constexpr expected(expected &&o) noexcept(
-        std::is_nothrow_move_constructible_v<T> &&
-        std::is_nothrow_move_constructible_v<E>)
+    expected(expected &&o) noexcept(std::is_nothrow_move_constructible_v<T> &&
+                                    std::is_nothrow_move_constructible_v<E>)
         : has_(o.has_)
     {
       if (has_)
-        new (&storage_.value) T(std::move(o.storage_.value));
+        ::new (static_cast<void *>(&storage_.val_)) T(std::move(o.storage_.val_));
       else
-        new (&storage_.error) E(std::move(o.storage_.error));
+        ::new (static_cast<void *>(&storage_.err_)) E(std::move(o.storage_.err_));
     }
 
-    constexpr expected &operator=(const expected &o)
+    expected &operator=(const expected &o)
     {
       if (this == &o)
         return *this;
-      destroy_();
+
+      this->~expected();
       has_ = o.has_;
+
       if (has_)
-        new (&storage_.value) T(o.storage_.value);
+        ::new (static_cast<void *>(&storage_.val_)) T(o.storage_.val_);
       else
-        new (&storage_.error) E(o.storage_.error);
+        ::new (static_cast<void *>(&storage_.err_)) E(o.storage_.err_);
+
       return *this;
     }
 
-    constexpr expected &operator=(expected &&o) noexcept(
-        std::is_nothrow_move_constructible_v<T> &&
-        std::is_nothrow_move_constructible_v<E>)
+    expected &operator=(expected &&o) noexcept(std::is_nothrow_move_constructible_v<T> &&
+                                               std::is_nothrow_move_constructible_v<E>)
     {
       if (this == &o)
         return *this;
-      destroy_();
+
+      this->~expected();
       has_ = o.has_;
+
       if (has_)
-        new (&storage_.value) T(std::move(o.storage_.value));
+        ::new (static_cast<void *>(&storage_.val_)) T(std::move(o.storage_.val_));
       else
-        new (&storage_.error) E(std::move(o.storage_.error));
+        ::new (static_cast<void *>(&storage_.err_)) E(std::move(o.storage_.err_));
+
       return *this;
     }
 
-    ~expected() { destroy_(); }
+    ~expected()
+    {
+      if (has_)
+        storage_.val_.~T();
+      else
+        storage_.err_.~E();
+    }
 
-    // Observers
+    // observers
     [[nodiscard]] constexpr bool has_value() const noexcept { return has_; }
     [[nodiscard]] constexpr explicit operator bool() const noexcept { return has_; }
 
-    [[nodiscard]] constexpr T &value() & { return storage_.value; }
-    [[nodiscard]] constexpr const T &value() const & { return storage_.value; }
-    [[nodiscard]] constexpr T &&value() && { return std::move(storage_.value); }
-
-    [[nodiscard]] constexpr E &error() & { return storage_.error; }
-    [[nodiscard]] constexpr const E &error() const & { return storage_.error; }
-    [[nodiscard]] constexpr E &&error() && { return std::move(storage_.error); }
-
-    // Convenience
-    [[nodiscard]] constexpr T value_or(T fallback) const
+    [[nodiscard]] constexpr T &value() & noexcept
     {
-      return has_ ? storage_.value : fallback;
+      assert(has_);
+      return storage_.val_;
+    }
+
+    [[nodiscard]] constexpr const T &value() const & noexcept
+    {
+      assert(has_);
+      return storage_.val_;
+    }
+
+    [[nodiscard]] constexpr T &&value() && noexcept
+    {
+      assert(has_);
+      return std::move(storage_.val_);
+    }
+
+    [[nodiscard]] constexpr E &error() & noexcept
+    {
+      assert(!has_);
+      return storage_.err_;
+    }
+
+    [[nodiscard]] constexpr const E &error() const & noexcept
+    {
+      assert(!has_);
+      return storage_.err_;
+    }
+
+    [[nodiscard]] constexpr E &&error() && noexcept
+    {
+      assert(!has_);
+      return std::move(storage_.err_);
     }
 
   private:
-    constexpr void destroy_() noexcept
-    {
-      if (has_)
-        storage_.value.~T();
-      else
-        storage_.error.~E();
-    }
-
     union Storage
     {
-      constexpr Storage() {}
-      ~Storage() {}
+      T val_;
+      E err_;
 
-      T value;
-      E error;
-    } storage_{};
+      Storage() {}
+      ~Storage() {}
+    } storage_;
 
     bool has_{false};
   };
 
-#endif // VIX_CONVERSION_HAS_STD_EXPECTED
-
-  /**
-   * @brief Helper to build an unexpected error in a consistent namespace.
-   */
-  template <typename E>
-  [[nodiscard]] constexpr unexpected<E> make_unexpected(E err)
-  {
-    return unexpected<E>(std::move(err));
-  }
+#endif
 
 } // namespace vix::conversion
+
+#endif

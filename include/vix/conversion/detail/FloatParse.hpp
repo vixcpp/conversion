@@ -1,4 +1,19 @@
-#pragma once
+/**
+ *
+ *  @file FloatParse.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2025, Gaspard Kirira.
+ *  All rights reserved.
+ *  https://github.com/vixcpp/vix
+ *
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the License file.
+ *
+ *  Vix.cpp
+ */
+#ifndef VIX_CONVERSION_FLOAT_PARSE_HPP
+#define VIX_CONVERSION_FLOAT_PARSE_HPP
 
 #include <cerrno>
 #include <cmath>
@@ -90,3 +105,5 @@ namespace vix::conversion::detail
   }
 
 } // namespace vix::conversion::detail
+
+#endif

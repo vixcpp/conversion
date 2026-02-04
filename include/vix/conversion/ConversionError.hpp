@@ -1,4 +1,19 @@
-#pragma once
+/**
+ *
+ *  @file ConversionError.hpp
+ *  @author Gaspard Kirira
+ *
+ *  Copyright 2025, Gaspard Kirira.
+ *  All rights reserved.
+ *  https://github.com/vixcpp/vix
+ *
+ *  Use of this source code is governed by a MIT license
+ *  that can be found in the License file.
+ *
+ *  Vix.cpp
+ */
+#ifndef VIX_CONVERSION_CONVERSION_ERROR_HPP
+#define VIX_CONVERSION_CONVERSION_ERROR_HPP
 
 #include <string_view>
 #include <cstdint>
@@ -43,8 +58,8 @@ namespace vix::conversion
   struct ConversionError
   {
     ConversionErrorCode code{ConversionErrorCode::None};
-    std::string_view input{}; // original input (non-owning)
-    std::size_t position{0};  // error position if relevant
+    std::string_view input{};
+    std::size_t position{0};
 
     constexpr ConversionError() = default;
 
@@ -99,3 +114,4 @@ namespace vix::conversion
   }
 
 } // namespace vix::conversion
+#endif
