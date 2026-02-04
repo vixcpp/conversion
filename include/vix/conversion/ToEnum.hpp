@@ -28,7 +28,9 @@ namespace vix::conversion
 {
 
   /**
-   * @brief Enum mapping entry.
+   * @brief Mapping entry used to convert between string and enum values.
+   *
+   * @tparam Enum Enum type.
    */
   template <typename Enum>
   struct EnumEntry
@@ -38,7 +40,9 @@ namespace vix::conversion
   };
 
   /**
-   * @brief Convert a string_view to an enum using an explicit mapping table.
+   * @brief Parse an enum value from string input using an explicit mapping table.
+   *
+   * The input is trimmed before matching. Matching can be ASCII case-insensitive.
    *
    * Example:
    *   static constexpr EnumEntry<Role> roles[] = {
@@ -46,10 +50,21 @@ namespace vix::conversion
    *     {"user",  Role::User}
    *   };
    *
-   *   auto r = to_enum<Role>(input, roles);
+   *   auto r = to_enum<Role>(input, roles, 2);
+   *
+   * Error codes:
+   * - EmptyInput if trimmed input is empty
+   * - UnknownEnumValue if no entry matches
+   *
+   * @tparam Enum Enum type.
+   * @param input Source input.
+   * @param entries Mapping table entries.
+   * @param count Number of entries.
+   * @param case_insensitive Whether comparison ignores ASCII case.
+   * @return expected<Enum, ConversionError> containing the enum value or an error.
    */
   template <typename Enum>
-  [[nodiscard]] constexpr expected<Enum, ConversionError>
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<Enum, ConversionError>
   to_enum(
       std::string_view input,
       const EnumEntry<Enum> *entries,
@@ -63,7 +78,8 @@ namespace vix::conversion
     if (s.empty())
     {
       return make_unexpected(ConversionError{
-          ConversionErrorCode::EmptyInput, input});
+          ConversionErrorCode::EmptyInput,
+          input});
     }
 
     for (std::size_t i = 0; i < count; ++i)
@@ -102,14 +118,22 @@ namespace vix::conversion
     }
 
     return make_unexpected(ConversionError{
-        ConversionErrorCode::UnknownEnumValue, input});
+        ConversionErrorCode::UnknownEnumValue,
+        input});
   }
 
   /**
-   * @brief Helper overload for static arrays.
+   * @brief Parse an enum value from string input using a static array mapping table.
+   *
+   * @tparam Enum Enum type.
+   * @tparam N Mapping table size.
+   * @param input Source input.
+   * @param entries Mapping table array.
+   * @param case_insensitive Whether comparison ignores ASCII case.
+   * @return expected<Enum, ConversionError> containing the enum value or an error.
    */
   template <typename Enum, std::size_t N>
-  [[nodiscard]] constexpr expected<Enum, ConversionError>
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<Enum, ConversionError>
   to_enum(
       std::string_view input,
       const EnumEntry<Enum> (&entries)[N],

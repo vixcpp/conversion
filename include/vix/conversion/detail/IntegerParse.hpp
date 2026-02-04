@@ -15,6 +15,7 @@
 #ifndef VIX_CONVERSION_INTEGER_PARSE_HPP
 #define VIX_CONVERSION_INTEGER_PARSE_HPP
 
+#include <cstddef>
 #include <limits>
 #include <string_view>
 #include <type_traits>
@@ -27,17 +28,27 @@ namespace vix::conversion::detail
 {
 
   /**
-   * @brief Parse a signed or unsigned integer from ASCII (base 10).
+   * @brief Parse a signed or unsigned integer from ASCII (base 10, strict).
    *
    * Rules:
-   * - No locale
-   * - No prefixes (no 0x, no 0b)
-   * - Optional leading '+' or '-'
-   * - At least one digit required
-   * - Entire string must be consumed
+   * - ASCII only, locale-free
+   * - no prefixes (no 0x, no 0b)
+   * - optional leading '+' or '-'
+   * - at least one digit required
+   * - the entire input must be digits (after optional sign)
+   * - overflow and underflow are detected
+   *
+   * Error codes:
+   * - EmptyInput when input is empty
+   * - InvalidCharacter when a non digit is encountered, or sign without digits
+   * - Overflow / Underflow when value does not fit the target type
+   *
+   * @tparam Int Target integral type.
+   * @param input Source input (already trimmed by caller when needed).
+   * @return expected<Int, ConversionError> containing the parsed value or an error.
    */
   template <typename Int>
-  [[nodiscard]] constexpr expected<Int, ConversionError>
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<Int, ConversionError>
   parse_integer(std::string_view input) noexcept
   {
     static_assert(std::is_integral_v<Int>, "parse_integer<Int>: Int must be integral");
@@ -47,13 +58,14 @@ namespace vix::conversion::detail
     if (input.empty())
     {
       return make_unexpected(ConversionError{
-          ConversionErrorCode::EmptyInput, input});
+          ConversionErrorCode::EmptyInput,
+          input});
     }
 
     std::size_t i = 0;
     bool negative = false;
 
-    // Sign
+    // Optional sign
     if (input[i] == '+' || input[i] == '-')
     {
       negative = (input[i] == '-');
@@ -62,7 +74,9 @@ namespace vix::conversion::detail
       if (i == input.size())
       {
         return make_unexpected(ConversionError{
-            ConversionErrorCode::InvalidCharacter, input, i - 1});
+            ConversionErrorCode::InvalidCharacter,
+            input,
+            i - 1});
       }
     }
 
@@ -76,7 +90,9 @@ namespace vix::conversion::detail
       if (!is_digit(c))
       {
         return make_unexpected(ConversionError{
-            ConversionErrorCode::InvalidCharacter, input, i});
+            ConversionErrorCode::InvalidCharacter,
+            input,
+            i});
       }
 
       has_digit = true;
@@ -90,7 +106,9 @@ namespace vix::conversion::detail
           if (value < (Limits::min() + digit) / 10)
           {
             return make_unexpected(ConversionError{
-                ConversionErrorCode::Underflow, input, i});
+                ConversionErrorCode::Underflow,
+                input,
+                i});
           }
           value = value * 10 - digit;
         }
@@ -100,7 +118,9 @@ namespace vix::conversion::detail
           if (value > (Limits::max() - digit) / 10)
           {
             return make_unexpected(ConversionError{
-                ConversionErrorCode::Overflow, input, i});
+                ConversionErrorCode::Overflow,
+                input,
+                i});
           }
           value = value * 10 + digit;
         }
@@ -111,13 +131,17 @@ namespace vix::conversion::detail
         if (negative)
         {
           return make_unexpected(ConversionError{
-              ConversionErrorCode::Underflow, input, 0});
+              ConversionErrorCode::Underflow,
+              input,
+              0});
         }
 
         if (value > (Limits::max() - digit) / 10)
         {
           return make_unexpected(ConversionError{
-              ConversionErrorCode::Overflow, input, i});
+              ConversionErrorCode::Overflow,
+              input,
+              i});
         }
 
         value = value * 10 + digit;
@@ -127,7 +151,8 @@ namespace vix::conversion::detail
     if (!has_digit)
     {
       return make_unexpected(ConversionError{
-          ConversionErrorCode::InvalidCharacter, input});
+          ConversionErrorCode::InvalidCharacter,
+          input});
     }
 
     return value;

@@ -15,10 +15,10 @@
 #ifndef VIX_CONVERSION_EXPECTED_HPP
 #define VIX_CONVERSION_EXPECTED_HPP
 
+#include <cassert>
+#include <new>
 #include <type_traits>
 #include <utility>
-#include <new>
-#include <cassert>
 
 #if defined(__has_include)
 #if __has_include(<expected>)
@@ -31,11 +31,44 @@
 #define VIX_HAS_STD_EXPECTED_HEADER 0
 #endif
 
+/**
+ * Use std::expected only when the standard library actually supports it.
+ * __cpp_lib_expected is a C++23 library feature macro.
+ */
+#if VIX_HAS_STD_EXPECTED_HEADER && defined(__cpp_lib_expected) && (__cpp_lib_expected >= 202202L)
+#define VIX_CONVERSION_EXPECTED_IS_STD 1
+#else
+#define VIX_CONVERSION_EXPECTED_IS_STD 0
+#endif
+
+/**
+ * In C++23 mode with std::expected, functions returning expected can be constexpr.
+ * In fallback mode, expected is not a literal type in C++20, so constexpr would warn.
+ */
+#if VIX_CONVERSION_EXPECTED_IS_STD
+#define VIX_EXPECTED_CONSTEXPR constexpr
+#else
+#define VIX_EXPECTED_CONSTEXPR inline
+#endif
+
 namespace vix::conversion
 {
 
-// Use std::expected only when it truly exists (C++23 library feature).
-#if VIX_HAS_STD_EXPECTED_HEADER && defined(__cpp_lib_expected) && (__cpp_lib_expected >= 202202L)
+  /**
+   * @brief expected/unexpected abstraction for Vix conversion APIs.
+   *
+   * Vix conversion must work in C++20, but std::expected is C++23.
+   * This header provides:
+   * - std::expected alias when available
+   * - otherwise a small C++20 fallback with the minimal API Vix needs
+   *
+   * The fallback supports:
+   * - operator bool / has_value
+   * - value() / error()
+   * - unexpected<E> and make_unexpected(E)
+   */
+
+#if VIX_CONVERSION_EXPECTED_IS_STD
 
   template <typename T, typename E>
   using expected = std::expected<T, E>;
@@ -44,16 +77,12 @@ namespace vix::conversion
   using unexpected = std::unexpected<E>;
 
   template <typename E>
-  [[nodiscard]] constexpr unexpected<E> make_unexpected(E err)
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR unexpected<E> make_unexpected(E err)
   {
     return unexpected<E>(std::move(err));
   }
 
 #else
-
-  // -----------------------------
-  // Minimal C++20 fallback expected
-  // -----------------------------
 
   template <typename E>
   class unexpected
@@ -61,26 +90,26 @@ namespace vix::conversion
   public:
     using error_type = E;
 
-    constexpr explicit unexpected(const E &e)
+    explicit unexpected(const E &e)
         : err_(e)
     {
     }
 
-    constexpr explicit unexpected(E &&e)
+    explicit unexpected(E &&e)
         : err_(std::move(e))
     {
     }
 
-    [[nodiscard]] constexpr const E &error() const & noexcept { return err_; }
-    [[nodiscard]] constexpr E &error() & noexcept { return err_; }
-    [[nodiscard]] constexpr E &&error() && noexcept { return std::move(err_); }
+    [[nodiscard]] const E &error() const & noexcept { return err_; }
+    [[nodiscard]] E &error() & noexcept { return err_; }
+    [[nodiscard]] E &&error() && noexcept { return std::move(err_); }
 
   private:
     E err_;
   };
 
   template <typename E>
-  [[nodiscard]] constexpr unexpected<E> make_unexpected(E err)
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR unexpected<E> make_unexpected(E err)
   {
     return unexpected<E>(std::move(err));
   }
@@ -93,26 +122,26 @@ namespace vix::conversion
     using error_type = E;
 
     // value constructors
-    constexpr expected(const T &v)
+    expected(const T &v)
         : has_(true)
     {
       ::new (static_cast<void *>(&storage_.val_)) T(v);
     }
 
-    constexpr expected(T &&v)
+    expected(T &&v)
         : has_(true)
     {
       ::new (static_cast<void *>(&storage_.val_)) T(std::move(v));
     }
 
     // error constructors
-    constexpr expected(const unexpected<E> &u)
+    expected(const unexpected<E> &u)
         : has_(false)
     {
       ::new (static_cast<void *>(&storage_.err_)) E(u.error());
     }
 
-    constexpr expected(unexpected<E> &&u)
+    expected(unexpected<E> &&u)
         : has_(false)
     {
       ::new (static_cast<void *>(&storage_.err_)) E(std::move(u).error());
@@ -141,7 +170,9 @@ namespace vix::conversion
     expected &operator=(const expected &o)
     {
       if (this == &o)
+      {
         return *this;
+      }
 
       this->~expected();
       has_ = o.has_;
@@ -158,7 +189,9 @@ namespace vix::conversion
                                                std::is_nothrow_move_constructible_v<E>)
     {
       if (this == &o)
+      {
         return *this;
+      }
 
       this->~expected();
       has_ = o.has_;
@@ -180,40 +213,41 @@ namespace vix::conversion
     }
 
     // observers
-    [[nodiscard]] constexpr bool has_value() const noexcept { return has_; }
-    [[nodiscard]] constexpr explicit operator bool() const noexcept { return has_; }
+    [[nodiscard]] bool has_value() const noexcept { return has_; }
+    [[nodiscard]] explicit operator bool() const noexcept { return has_; }
 
-    [[nodiscard]] constexpr T &value() & noexcept
+    // accessors
+    [[nodiscard]] T &value() & noexcept
     {
       assert(has_);
       return storage_.val_;
     }
 
-    [[nodiscard]] constexpr const T &value() const & noexcept
+    [[nodiscard]] const T &value() const & noexcept
     {
       assert(has_);
       return storage_.val_;
     }
 
-    [[nodiscard]] constexpr T &&value() && noexcept
+    [[nodiscard]] T &&value() && noexcept
     {
       assert(has_);
       return std::move(storage_.val_);
     }
 
-    [[nodiscard]] constexpr E &error() & noexcept
+    [[nodiscard]] E &error() & noexcept
     {
       assert(!has_);
       return storage_.err_;
     }
 
-    [[nodiscard]] constexpr const E &error() const & noexcept
+    [[nodiscard]] const E &error() const & noexcept
     {
       assert(!has_);
       return storage_.err_;
     }
 
-    [[nodiscard]] constexpr E &&error() && noexcept
+    [[nodiscard]] E &&error() && noexcept
     {
       assert(!has_);
       return std::move(storage_.err_);

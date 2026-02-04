@@ -27,16 +27,26 @@ namespace vix::conversion
 {
 
   /**
-   * @brief Convert a string_view to a floating-point type (strict).
+   * @brief Parse a floating point value from string input (strict).
    *
    * Rules:
-   * - ASCII trim is applied automatically.
-   * - Accepts decimal and scientific notation (e/E) using C parsing.
-   * - Entire trimmed string must be consumed (no trailing chars).
-   * - Overflow/underflow are detected.
+   * - ASCII trim is applied
+   * - decimal and scientific notation are supported (e/E)
+   * - the entire trimmed input must be consumed (no trailing characters)
+   * - overflow and underflow are detected
+   *
+   * Error codes:
+   * - EmptyInput if trimmed input is empty
+   * - InvalidFloat if parsing fails
+   * - TrailingCharacters if extra characters remain after the number
+   * - Overflow or Underflow if the value is outside representable range
+   *
+   * @tparam Float Target floating point type.
+   * @param input Source input.
+   * @return expected<Float, ConversionError> containing the parsed value or an error.
    */
   template <typename Float>
-  [[nodiscard]] inline expected<Float, ConversionError>
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<Float, ConversionError>
   to_float(std::string_view input) noexcept
   {
     static_assert(std::is_floating_point_v<Float>, "to_float<Float>: Float must be floating point");
@@ -46,35 +56,54 @@ namespace vix::conversion
     if (trimmed.empty())
     {
       return make_unexpected(ConversionError{
-          ConversionErrorCode::EmptyInput, input});
+          ConversionErrorCode::EmptyInput,
+          input});
     }
 
     auto r = detail::parse_float<Float>(trimmed);
     if (!r)
     {
       ConversionError e = r.error();
-      e.input = input; // keep original for upstream diagnostics
+      e.input = input; // preserve original input for upstream diagnostics
       return make_unexpected(e);
     }
 
     return r.value();
   }
 
-  // Convenience wrappers
-
-  [[nodiscard]] inline expected<float, ConversionError>
+  /**
+   * @brief Parse a 32-bit float from string input.
+   *
+   * @param input Source input.
+   * @return expected<float, ConversionError> containing the parsed value or an error.
+   */
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<float, ConversionError>
   to_float32(std::string_view input) noexcept
   {
     return to_float<float>(input);
   }
 
-  [[nodiscard]] inline expected<double, ConversionError>
+  /**
+   * @brief Parse a 64-bit double from string input.
+   *
+   * @param input Source input.
+   * @return expected<double, ConversionError> containing the parsed value or an error.
+   */
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<double, ConversionError>
   to_float64(std::string_view input) noexcept
   {
     return to_float<double>(input);
   }
 
-  [[nodiscard]] inline expected<long double, ConversionError>
+  /**
+   * @brief Parse a long double from string input.
+   *
+   * Note: the actual precision depends on the platform ABI.
+   *
+   * @param input Source input.
+   * @return expected<long double, ConversionError> containing the parsed value or an error.
+   */
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<long double, ConversionError>
   to_float80(std::string_view input) noexcept
   {
     return to_float<long double>(input);

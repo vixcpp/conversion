@@ -28,10 +28,16 @@ namespace vix::conversion
 {
 
   /**
-   * @brief Convert an integral value to string (base 10).
+   * @brief Convert an integral value to a decimal string (base 10).
+   *
+   * Uses std::to_chars for fast, allocation-free formatting into a stack buffer.
+   *
+   * @tparam Int Integral type.
+   * @param value Value to format.
+   * @return expected<std::string, ConversionError> containing the string or an error.
    */
   template <typename Int>
-  [[nodiscard]] inline expected<std::string, ConversionError>
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<std::string, ConversionError>
   to_string(Int value) noexcept
   {
     static_assert(std::is_integral_v<Int>, "to_string<Int>: Int must be integral");
@@ -42,21 +48,24 @@ namespace vix::conversion
     if (ec != std::errc{})
     {
       return make_unexpected(ConversionError{
-          ConversionErrorCode::InvalidCharacter, {}});
+          ConversionErrorCode::InvalidCharacter,
+          {}});
     }
 
     return std::string(buffer, ptr);
   }
 
   /**
-   * @brief Convert a floating-point value to string.
+   * @brief Convert a floating point value to string.
    *
-   * Note:
-   * - Uses std::to_chars when available (C++20).
-   * - Falls back to std::string formatting behavior defined by the standard.
+   * Uses std::to_chars. If formatting fails, returns InvalidFloat.
+   *
+   * @tparam Float Floating point type.
+   * @param value Value to format.
+   * @return expected<std::string, ConversionError> containing the string or an error.
    */
   template <typename Float>
-  [[nodiscard]] inline expected<std::string, ConversionError>
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<std::string, ConversionError>
   to_string(Float value) noexcept
   {
     static_assert(std::is_floating_point_v<Float>, "to_string<Float>: Float must be floating point");
@@ -67,23 +76,29 @@ namespace vix::conversion
     if (ec != std::errc{})
     {
       return make_unexpected(ConversionError{
-          ConversionErrorCode::InvalidFloat, {}});
+          ConversionErrorCode::InvalidFloat,
+          {}});
     }
 
     return std::string(buffer, ptr);
   }
 
   /**
-   * @brief Convert bool to string ("true" / "false").
+   * @brief Convert bool to string ("true" or "false").
+   *
+   * @param value Boolean value.
+   * @return expected<std::string, ConversionError> containing the string.
    */
-  [[nodiscard]] inline expected<std::string, ConversionError>
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<std::string, ConversionError>
   to_string(bool value) noexcept
   {
     return value ? std::string("true") : std::string("false");
   }
 
   /**
-   * @brief Convert enum to string using explicit mapping.
+   * @brief Convert an enum to string using an explicit mapping table.
+   *
+   * If the enum value is not found in the mapping table, returns UnknownEnumValue.
    *
    * Example:
    *   static constexpr EnumEntry<Role> roles[] = {
@@ -92,9 +107,15 @@ namespace vix::conversion
    *   };
    *
    *   auto s = to_string(Role::Admin, roles);
+   *
+   * @tparam Enum Enum type.
+   * @param value Enum value.
+   * @param entries Mapping table entries.
+   * @param count Number of entries.
+   * @return expected<std::string, ConversionError> containing the string or an error.
    */
   template <typename Enum>
-  [[nodiscard]] inline expected<std::string, ConversionError>
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<std::string, ConversionError>
   to_string(
       Enum value,
       const EnumEntry<Enum> *entries,
@@ -111,14 +132,21 @@ namespace vix::conversion
     }
 
     return make_unexpected(ConversionError{
-        ConversionErrorCode::UnknownEnumValue, {}});
+        ConversionErrorCode::UnknownEnumValue,
+        {}});
   }
 
   /**
-   * @brief Helper overload for static arrays.
+   * @brief Convert an enum to string using a static array mapping table.
+   *
+   * @tparam Enum Enum type.
+   * @tparam N Mapping table size.
+   * @param value Enum value.
+   * @param entries Mapping table array.
+   * @return expected<std::string, ConversionError> containing the string or an error.
    */
   template <typename Enum, std::size_t N>
-  [[nodiscard]] inline expected<std::string, ConversionError>
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<std::string, ConversionError>
   to_string(Enum value, const EnumEntry<Enum> (&entries)[N]) noexcept
   {
     return to_string(value, entries, N);

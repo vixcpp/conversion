@@ -21,26 +21,36 @@
 #include <vix/conversion/ConversionError.hpp>
 #include <vix/conversion/Expected.hpp>
 #include <vix/conversion/ToBool.hpp>
+#include <vix/conversion/ToEnum.hpp>
 #include <vix/conversion/ToFloat.hpp>
 #include <vix/conversion/ToInt.hpp>
-#include <vix/conversion/ToEnum.hpp>
 
 namespace vix::conversion
 {
 
   /**
-   * @brief Generic parse<T> for common scalar types.
+   * @brief Parse a scalar value from string input.
    *
-   * Supported:
-   * - Integral types
-   * - Floating point types
+   * Converts a string representation into a strongly typed scalar.
+   * The result is returned as an expected-like object:
+   * - success: contains the parsed value
+   * - failure: contains ConversionError describing the failure
+   *
+   * Supported types:
    * - bool
+   * - integral types
+   * - floating point types
    *
    * For enums:
-   * - use parse_enum<T>(input, mapping) or to_enum<T>(...)
+   * - use parse_enum (mapping table)
+   * - or call to_enum directly
+   *
+   * @tparam T Target type to parse.
+   * @param input Source input as string_view.
+   * @return expected<T, ConversionError> with value on success, error on failure.
    */
   template <typename T>
-  [[nodiscard]] inline expected<T, ConversionError>
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<T, ConversionError>
   parse(std::string_view input) noexcept
   {
     if constexpr (std::is_same_v<T, bool>)
@@ -60,15 +70,22 @@ namespace vix::conversion
       static_assert(!std::is_same_v<T, T>,
                     "vix::conversion::parse<T>: unsupported type. "
                     "Supported: integral, floating point, bool. "
-                    "For enums, use parse_enum<T>(input, mapping).");
+                    "For enums, use parse_enum<T>(...).");
     }
   }
 
   /**
-   * @brief Parse an enum using an explicit mapping table.
+   * @brief Parse an enum from string input using an explicit mapping table.
+   *
+   * @tparam Enum Enum type.
+   * @param input Source input as string_view.
+   * @param entries Pointer to mapping table entries.
+   * @param count Number of entries in the mapping table.
+   * @param case_insensitive Whether the match should ignore ASCII case.
+   * @return expected<Enum, ConversionError> with value on success, error on failure.
    */
   template <typename Enum>
-  [[nodiscard]] inline expected<Enum, ConversionError>
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<Enum, ConversionError>
   parse_enum(
       std::string_view input,
       const EnumEntry<Enum> *entries,
@@ -79,10 +96,17 @@ namespace vix::conversion
   }
 
   /**
-   * @brief Helper overload for static arrays.
+   * @brief Parse an enum from string input using a static array mapping table.
+   *
+   * @tparam Enum Enum type.
+   * @tparam N Mapping table size.
+   * @param input Source input as string_view.
+   * @param entries Mapping table array.
+   * @param case_insensitive Whether the match should ignore ASCII case.
+   * @return expected<Enum, ConversionError> with value on success, error on failure.
    */
   template <typename Enum, std::size_t N>
-  [[nodiscard]] inline expected<Enum, ConversionError>
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<Enum, ConversionError>
   parse_enum(
       std::string_view input,
       const EnumEntry<Enum> (&entries)[N],

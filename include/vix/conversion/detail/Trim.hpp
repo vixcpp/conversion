@@ -15,6 +15,7 @@
 #ifndef VIX_CONVERSION_TRIM_HPP
 #define VIX_CONVERSION_TRIM_HPP
 
+#include <cstddef>
 #include <string_view>
 
 #include <vix/conversion/detail/Ascii.hpp>
@@ -23,7 +24,12 @@ namespace vix::conversion::detail
 {
 
   /**
-   * @brief Trim ASCII whitespace on the left.
+   * @brief Trim ASCII whitespace on the left side.
+   *
+   * Whitespace is defined by detail::is_space (ASCII only, locale-free).
+   *
+   * @param s Input string view.
+   * @return View with leading ASCII whitespace removed.
    */
   [[nodiscard]] constexpr std::string_view ltrim(std::string_view s) noexcept
   {
@@ -36,7 +42,10 @@ namespace vix::conversion::detail
   }
 
   /**
-   * @brief Trim ASCII whitespace on the right.
+   * @brief Trim ASCII whitespace on the right side.
+   *
+   * @param s Input string view.
+   * @return View with trailing ASCII whitespace removed.
    */
   [[nodiscard]] constexpr std::string_view rtrim(std::string_view s) noexcept
   {
@@ -50,6 +59,9 @@ namespace vix::conversion::detail
 
   /**
    * @brief Trim ASCII whitespace on both sides.
+   *
+   * @param s Input string view.
+   * @return View with leading and trailing ASCII whitespace removed.
    */
   [[nodiscard]] constexpr std::string_view trim(std::string_view s) noexcept
   {

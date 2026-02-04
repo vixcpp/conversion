@@ -15,8 +15,9 @@
 #ifndef VIX_CONVERSION_CONVERSION_ERROR_HPP
 #define VIX_CONVERSION_CONVERSION_ERROR_HPP
 
-#include <string_view>
+#include <cstddef>
 #include <cstdint>
+#include <string_view>
 
 namespace vix::conversion
 {
@@ -24,8 +25,9 @@ namespace vix::conversion
   /**
    * @brief Error codes for low-level type conversion.
    *
-   * These errors are purely technical and MUST NOT contain
-   * business or validation logic.
+   * These errors are purely technical and must not contain any business
+   * or validation logic. They are intended for diagnostics, logs, and for
+   * higher layers to map into domain level errors.
    */
   enum class ConversionErrorCode : std::uint8_t
   {
@@ -53,7 +55,8 @@ namespace vix::conversion
   /**
    * @brief Structured conversion error.
    *
-   * Lightweight, trivially copyable, no allocations.
+   * Lightweight, no allocations. Carries an error code, the original input,
+   * and an optional position hint for failures that point to a character index.
    */
   struct ConversionError
   {
@@ -71,6 +74,9 @@ namespace vix::conversion
     {
     }
 
+    /**
+     * @brief True when no error occurred.
+     */
     [[nodiscard]] constexpr bool ok() const noexcept
     {
       return code == ConversionErrorCode::None;
@@ -78,12 +84,15 @@ namespace vix::conversion
   };
 
   /**
-   * @brief Human-readable short description for diagnostics/logs.
+   * @brief Short string representation of ConversionErrorCode.
    *
-   * IMPORTANT:
+   * Notes:
    * - Not localized
    * - Not user-facing UI text
-   * - For logs, debug, and developer diagnostics only
+   * - Intended for logs and developer diagnostics
+   *
+   * @param code Error code.
+   * @return A stable string representation.
    */
   [[nodiscard]] constexpr std::string_view
   to_string(ConversionErrorCode code) noexcept
@@ -114,4 +123,5 @@ namespace vix::conversion
   }
 
 } // namespace vix::conversion
+
 #endif

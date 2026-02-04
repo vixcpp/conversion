@@ -15,8 +15,9 @@
 #ifndef VIX_CONVERSION_FLOAT_PARSE_HPP
 #define VIX_CONVERSION_FLOAT_PARSE_HPP
 
+#include <cstddef>
 #include <cerrno>
-#include <cmath>
+#include <cstdlib>
 #include <limits>
 #include <string_view>
 #include <type_traits>
@@ -28,15 +29,25 @@ namespace vix::conversion::detail
 {
 
   /**
-   * @brief Parse a floating-point number from ASCII (C locale).
+   * @brief Parse a floating point value from ASCII input (strict, C parsing).
    *
    * Notes:
-   * - Uses std::strtod / std::strtof / std::strtold internally
-   * - Locale-independent when input is ASCII and decimal separator is '.'
-   * - Entire string must be consumed
+   * - Uses std::strtof / std::strtod / std::strtold internally.
+   * - Requires '.' as decimal separator (typical C locale behavior).
+   * - Entire input must be consumed (no trailing characters).
+   *
+   * Error codes:
+   * - EmptyInput if input is empty
+   * - InvalidFloat if no conversion was performed
+   * - TrailingCharacters if extra characters remain after the number
+   * - Overflow or Underflow on ERANGE or range checks
+   *
+   * @tparam Float Target floating point type.
+   * @param input Source input (already trimmed by caller when needed).
+   * @return expected<Float, ConversionError> containing the parsed value or an error.
    */
   template <typename Float>
-  [[nodiscard]] inline expected<Float, ConversionError>
+  [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<Float, ConversionError>
   parse_float(std::string_view input) noexcept
   {
     static_assert(std::is_floating_point_v<Float>, "parse_float<Float>: Float must be floating point");
@@ -44,7 +55,8 @@ namespace vix::conversion::detail
     if (input.empty())
     {
       return make_unexpected(ConversionError{
-          ConversionErrorCode::EmptyInput, input});
+          ConversionErrorCode::EmptyInput,
+          input});
     }
 
     const char *begin = input.data();
@@ -71,15 +83,18 @@ namespace vix::conversion::detail
     if (begin == end)
     {
       return make_unexpected(ConversionError{
-          ConversionErrorCode::InvalidFloat, input});
+          ConversionErrorCode::InvalidFloat,
+          input});
     }
 
     // Trailing characters not allowed
-    if (static_cast<std::size_t>(end - begin) != input.size())
+    const std::size_t consumed = static_cast<std::size_t>(end - begin);
+    if (consumed != input.size())
     {
       return make_unexpected(ConversionError{
-          ConversionErrorCode::TrailingCharacters, input,
-          static_cast<std::size_t>(end - begin)});
+          ConversionErrorCode::TrailingCharacters,
+          input,
+          consumed});
     }
 
     if (errno == ERANGE)
@@ -87,10 +102,12 @@ namespace vix::conversion::detail
       if (value == 0.0L)
       {
         return make_unexpected(ConversionError{
-            ConversionErrorCode::Underflow, input});
+            ConversionErrorCode::Underflow,
+            input});
       }
       return make_unexpected(ConversionError{
-          ConversionErrorCode::Overflow, input});
+          ConversionErrorCode::Overflow,
+          input});
     }
 
     // Final range check for target type
@@ -98,7 +115,8 @@ namespace vix::conversion::detail
         value > static_cast<long double>(std::numeric_limits<Float>::max()))
     {
       return make_unexpected(ConversionError{
-          ConversionErrorCode::Overflow, input});
+          ConversionErrorCode::Overflow,
+          input});
     }
 
     return static_cast<Float>(value);
