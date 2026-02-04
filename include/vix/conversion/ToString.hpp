@@ -16,6 +16,7 @@
 #define VIX_CONVERSION_TO_STRING_HPP
 
 #include <charconv>
+#include <cstddef>
 #include <string>
 #include <string_view>
 #include <type_traits>
@@ -32,16 +33,17 @@ namespace vix::conversion
    *
    * Uses std::to_chars for fast, allocation-free formatting into a stack buffer.
    *
-   * @tparam Int Integral type.
+   * Note: bool is excluded from this overload (use to_string(bool)).
+   *
+   * @tparam Int Integral type (excluding bool).
    * @param value Value to format.
    * @return expected<std::string, ConversionError> containing the string or an error.
    */
   template <typename Int>
+    requires(std::is_integral_v<Int> && !std::is_same_v<std::remove_cv_t<Int>, bool>)
   [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<std::string, ConversionError>
   to_string(Int value) noexcept
   {
-    static_assert(std::is_integral_v<Int>, "to_string<Int>: Int must be integral");
-
     char buffer[64];
     auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), value);
 
@@ -65,11 +67,10 @@ namespace vix::conversion
    * @return expected<std::string, ConversionError> containing the string or an error.
    */
   template <typename Float>
+    requires(std::is_floating_point_v<Float>)
   [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<std::string, ConversionError>
   to_string(Float value) noexcept
   {
-    static_assert(std::is_floating_point_v<Float>, "to_string<Float>: Float must be floating point");
-
     char buffer[128];
     auto [ptr, ec] = std::to_chars(buffer, buffer + sizeof(buffer), value);
 
@@ -100,14 +101,6 @@ namespace vix::conversion
    *
    * If the enum value is not found in the mapping table, returns UnknownEnumValue.
    *
-   * Example:
-   *   static constexpr EnumEntry<Role> roles[] = {
-   *     {"admin", Role::Admin},
-   *     {"user",  Role::User}
-   *   };
-   *
-   *   auto s = to_string(Role::Admin, roles);
-   *
    * @tparam Enum Enum type.
    * @param value Enum value.
    * @param entries Mapping table entries.
@@ -115,14 +108,13 @@ namespace vix::conversion
    * @return expected<std::string, ConversionError> containing the string or an error.
    */
   template <typename Enum>
+    requires(std::is_enum_v<Enum>)
   [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<std::string, ConversionError>
   to_string(
       Enum value,
       const EnumEntry<Enum> *entries,
       std::size_t count) noexcept
   {
-    static_assert(std::is_enum_v<Enum>, "to_string<Enum>: Enum must be an enum");
-
     for (std::size_t i = 0; i < count; ++i)
     {
       if (entries[i].value == value)
@@ -146,6 +138,7 @@ namespace vix::conversion
    * @return expected<std::string, ConversionError> containing the string or an error.
    */
   template <typename Enum, std::size_t N>
+    requires(std::is_enum_v<Enum>)
   [[nodiscard]] VIX_EXPECTED_CONSTEXPR expected<std::string, ConversionError>
   to_string(Enum value, const EnumEntry<Enum> (&entries)[N]) noexcept
   {
@@ -154,4 +147,4 @@ namespace vix::conversion
 
 } // namespace vix::conversion
 
-#endif
+#endif // VIX_CONVERSION_TO_STRING_HPP
