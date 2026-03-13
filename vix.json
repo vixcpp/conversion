@@ -1,0 +1,28 @@
+{
+  "name": "conversion",
+  "namespace": "vix",
+  "version": "0.1.0",
+  "type": "header-only",
+  "include": "include",
+  "license": "MIT",
+  "description": "Low-level, zero-overhead type conversion utilities for C++ (string to int, enum, bool, etc.) with explicit error handling.",
+  "keywords": [
+    "cpp",
+    "vix",
+    "conversion",
+    "type",
+    "string",
+    "int",
+    "enum",
+    "bool",
+    "header-only",
+    "utilities"
+  ],
+  "repository": "https://github.com/vixcpp/conversion",
+  "authors": [
+    {
+      "name": "Gaspard Kirira",
+      "github": "Gaspardkirira"
+    }
+  ]
+}
