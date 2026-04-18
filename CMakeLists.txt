@@ -94,11 +94,11 @@ if (CONVERSION_SOURCES)
   endif()
 
   if (TARGET vix_warnings)
-    target_link_libraries(vix_conversion PUBLIC vix_warnings)
+    target_link_libraries(vix_conversion PRIVATE vix_warnings)
   endif()
 
   if (VIX_ENABLE_SANITIZERS AND TARGET vix_sanitizers)
-    target_link_libraries(vix_conversion PUBLIC vix_sanitizers)
+    target_link_libraries(vix_conversion PRIVATE vix_sanitizers)
   endif()
 
   set_target_properties(vix_conversion PROPERTIES
