@@ -135,6 +135,10 @@ else()
     $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   )
 
+  set_target_properties(vix_conversion PROPERTIES
+    EXPORT_NAME conversion
+  )
+
   if (VIX_UTILS_TARGET)
     target_link_libraries(vix_conversion INTERFACE ${VIX_UTILS_TARGET})
   endif()
