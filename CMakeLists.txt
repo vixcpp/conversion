@@ -50,30 +50,6 @@ endif()
 # Sources discovery
 file(GLOB_RECURSE CONVERSION_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/*.cpp")
 
-# Optional dependency example (OFF by default)
-# Keep conversion minimal and standalone.
-option(VIX_CONVERSION_USE_UTILS "Link vix::utils if available (optional)" OFF)
-set(VIX_UTILS_TARGET "")
-
-if (VIX_CONVERSION_USE_UTILS)
-  if (DEFINED VIX_UMBRELLA_BUILD AND VIX_UMBRELLA_BUILD)
-    if (NOT TARGET vix::utils)
-      message(FATAL_ERROR "[conversion] Umbrella build: VIX_CONVERSION_USE_UTILS=ON but vix::utils target is missing.")
-    endif()
-    set(VIX_UTILS_TARGET vix::utils)
-  else()
-    if (TARGET vix::utils)
-      set(VIX_UTILS_TARGET vix::utils)
-    elseif (EXISTS "${CMAKE_CURRENT_LIST_DIR}/../utils/CMakeLists.txt")
-      message(STATUS "[conversion] Adding utils from umbrella: ../utils")
-      add_subdirectory("${CMAKE_CURRENT_LIST_DIR}/../utils" "utils")
-      set(VIX_UTILS_TARGET vix::utils)
-    else()
-      message(FATAL_ERROR "[conversion] VIX_CONVERSION_USE_UTILS=ON but vix::utils not found. Provide it or turn this option OFF.")
-    endif()
-  endif()
-endif()
-
 # STATIC
 if (CONVERSION_SOURCES)
   message(STATUS "[conversion] Building STATIC library with detected sources.")
@@ -88,10 +64,6 @@ if (CONVERSION_SOURCES)
       $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
       $<INSTALL_INTERFACE:${CMAKE_INSTALL_INCLUDEDIR}>
   )
-
-  if (VIX_UTILS_TARGET)
-    target_link_libraries(vix_conversion PUBLIC ${VIX_UTILS_TARGET})
-  endif()
 
   if (TARGET vix_warnings)
     target_link_libraries(vix_conversion PRIVATE vix_warnings)
@@ -139,10 +111,6 @@ else()
     EXPORT_NAME conversion
   )
 
-  if (VIX_UTILS_TARGET)
-    target_link_libraries(vix_conversion INTERFACE ${VIX_UTILS_TARGET})
-  endif()
-
   if (VIX_ENABLE_SANITIZERS AND TARGET vix_sanitizers)
     target_link_libraries(vix_conversion INTERFACE vix_sanitizers)
   endif()
@@ -175,11 +143,6 @@ if (CONVERSION_SOURCES)
   message(STATUS "Mode: STATIC / sources found")
 else()
   message(STATUS "Mode: HEADER-ONLY / no sources")
-endif()
-if (VIX_UTILS_TARGET)
-  message(STATUS "Utils target: ${VIX_UTILS_TARGET}")
-else()
-  message(STATUS "Utils target: (none)")
 endif()
 message(STATUS "Include dir: ${CMAKE_CURRENT_SOURCE_DIR}/include (for <vix/conversion/...>)")
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
